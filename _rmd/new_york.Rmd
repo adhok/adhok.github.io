@@ -1,0 +1,133 @@
+---
+title: "New York"
+author: "Pradeep Adhokshaja"
+date: "6 December 2016"
+output:
+  md_document:
+    variant: markdown_github
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+The American police departments are not only responsible for catching criminals. They form an integral part of the American Community. They handle every thing from routine tasks such as directing traffic to being first responders the the country's worst disasters.
+
+In this project , we look at the home of the largest local police department in the USA, New York. The NYPD was founded in 1845 and it is one of the most recognizable law enforcement agencies in the world. It currently consists of around 40,000 sworn officers. In this project, using the data provided by Five Thirty Eight  we try to uncover trends.
+
+```{r echo=FALSE}
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(data.table)
+library(tidyr)
+library(formattable)
+library(viridisLite)
+library(ggthemes)
+police <- fread("clean_data.csv",stringsAsFactors = F)
+police$date <- as.POSIXct(police$date,format="%Y-%m-%d")
+nyc <- subset(police,state %in%c('NY'))
+
+
+
+```
+
+## Number of Police Deaths in New York  State by Year
+
+```{r echo=FALSE}
+
+nyc_killed <- nyc %>% group_by(year) %>% summarise(n=n())
+police_killed <- police %>% group_by(year,state) %>% summarise(n=n()) %>% group_by(year) %>%summarise(avg=mean(n))
+killed_year <- merge(nyc_killed,police_killed)
+killed_year<- killed_year %>% gather(Type,Value,2:3)
+killed_year$Type <- ifelse(killed_year$Type=='avg',"National Average","Killed in New York")
+ggplot(killed_year, aes(x=year, y=Value, fill=Type)) + geom_line() +
+geom_point(size=2, shape=21)+ggtitle("Police Deaths in New York vs National Average By Year")+theme_hc(bgcolor = "default") +
+  scale_fill_hc("default")
+```
+<p> We see that the number of officers killed in New York State exceeds the nation average from the early 1900's onwards. As the population of a region increases , the crime rate is also bound to increase. The early 1900's saw a large influx of immigrants. The great depression also occurred during this time which led to people taking extreme measures to provide for their families. Unemployment benefits did not exist back then. The depression lasted for around ten years during which unemployment  hit a all time high(25%). After this period, the second World War employed a lot of labour for the manufacturing industries. The USA was supplying about 11% of the of the Allies' needs.We also see police deaths reducing during this time</p>
+
+## Top Departments
+
+```{r echo=FALSE}
+DT::datatable(nyc %>% group_by(dept_name)%>% summarise(n=n()) %>% arrange(desc(n)))
+```
+<p> The  department in New York State which has the highest death count is the NYPD. We will look into this further</p<
+
+## NYPD Deaths{.tabset}
+
+### By Year
+
+```{r echo=F}
+nypd <- subset(nyc,dept_name %in% c('New York City Police Department'))
+ny_killed <- nyc %>% group_by(year,dept_name) %>% summarise(n=n()) %>% group_by(year) %>%summarise(avg=mean(n))
+nypd_killed <- nypd %>% group_by(year) %>% summarise(n=n())
+killed_year <- merge(nypd_killed,ny_killed)
+killed_year<- killed_year %>% gather(Type,Value,2:3)
+killed_year$Type <- ifelse(killed_year$Type=='avg',"State Average","NYPD")
+ggplot(killed_year, aes(x=year, y=Value, fill=Type)) + geom_line() +
+geom_point(size=2, shape=21)+ggtitle(" Average Police Deaths in New York State vs NYPD Deaths")+theme_hc(bgcolor = "darkunica") +
+  scale_fill_hc("darkunica")
+  
+
+```
+
+<p> We see that the NYPD death counts exceeds the average death counts of the state almost all the time.</p>
+### Top Causes
+
+```{r echo=F}
+nypd%>% group_by(cause_short) %>% summarise(n=n()) %>% arrange(desc(n)) %>% top_n(10) %>%
+  formattable(list(n = color_bar("orange")), align = 'l')
+
+
+```
+
+<p> From the above table, we see that the highest number of deaths are caused by gunfire, followed by 9/11 related illness. This is then followed by automobile accidents and heart attack.</p>
+
+### Causes of Death by Year
+
+```{r echo=F}
+nypd %>% filter(cause_short %in% c("Gunfire","9/11 related illness","Automobile accident")) %>% group_by(year,cause_short) %>% summarise(n=n()) %>%
+  ggplot(aes(x=year, y=log(n), fill=cause_short)) + geom_line() +
+geom_point(size=2, shape=21)+ggtitle("Top Three Causes of Death")+theme_hc(bgcolor = "darkunica") +scale_fill_hc("darkunica")
+  
+
+```
+
+<p>Upon plotting the top three causes of Death across time, we see the gunfire occurs with a larger frequency across the years.</p>
+
+### Titles of the officers who were killed by Year
+
+```{r echo=F}
+nypd$title <- gsub("([A-Za-z]+).*", "\\1", nypd$person)
+nypd %>% group_by(title) %>% summarise(n=n())%>%
+  ggplot(aes(x=reorder(title, n), y=n)) +
+geom_point(size=3) + # Use a larger dot
+theme_bw() +
+theme(axis.text.x = element_text(angle=60, hjust=1),
+panel.grid.major.y = element_blank(),
+panel.grid.minor.y = element_blank(),
+panel.grid.major.x = element_line(colour="grey60", linetype="dashed"))+ggtitle("Numbers killed by Title")
+
+
+```
+ <p> Most of the officers who were killed in the NYPD were patrolmen, followed by police officers. We will analyse these two titles over the years.</p>
+ 
+### Patrolman and Police
+
+```{r echo=F}
+
+nypd %>% group_by(year,title) %>% summarise(n=n()) %>% filter(title  %in%c('Police','Patrolman')) %>%
+  ggplot(aes(x=year, y=log(n), fill=title)) + geom_line() +
+geom_point(size=4, shape=21)+ggtitle("Police Officers and Patrol Men")+theme_hc(bgcolor = "default") +scale_fill_hc("default")
+  
+```
+<p> We see that police officers started getting killed from the early 1970's onwards. This is probably because of changes in the way the public started addressing patrolling officers</p>
+
+
+## Sources
+
+https://www.lycoming.edu/schemata/pdfs/Marshall_ECON236.pdf
+https://en.wikipedia.org/wiki/History_of_New_York#Civil_War_to_1900
